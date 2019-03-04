@@ -15,7 +15,7 @@ Response system: A Self-developed and trained model to initiate responses and ac
 
 Sensory Modules: The system utilizes Gyromagnetic domains to Balance the robot and at the same time record the coordinates and movements alongside Recognition of obstacles and mapping the space around 3dimentionally.
 
-Robot Movement: Each degree of freedom and its movements are coupled and synchronized to work using twin Arduino mega boards externally controlled by our compute server(Rpi with Movidius)
+Robot Movement: Each degree of freedom and its movements are coupled and synchronized to work using twin Arduino mega boards externally controlled by our compute server(Upsquared board with Movidius)
 
 <h2>Technologies Used</h2>
 IOT, Embedded Computing, Movidius Neural Compute Stick, Theano, Tensorflow, OpenCV, Devcloud, Linux, Kinect Sensor, Openvino, DeepSpeech, Linux
