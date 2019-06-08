@@ -53,11 +53,11 @@ Sounds good for you? Then let's get started!
 
 ```sh
 # Clone the repository (stable branch)
-git clone -b master https://github.com/leon-ai/leon.git leon
+git clone https://github.com/nhadiq97/AIROBOT
 
 
 # Go to the project root
-cd leon
+cd AIROBOT/LEON
 
 # Install
 npm install
