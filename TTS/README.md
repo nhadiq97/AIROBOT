@@ -76,6 +76,153 @@ Notebooks supposed to be executed on https://colab.research.google.com are avail
 
 ## Installation
 
-Please install packages listed above first, and then 
+Please install packages listed above first, and then https://github.com/nhadiq97/AIROBOT && cd AIROBOT/TTS
+pip install -e ".[bin]"
+
+## Getting started
+
+### Preset parameters
+
+There are many hyper parameters to be turned depends on what model and data you are working on. For typical datasets and models, parameters that known to work good (**preset**) are provided in the repository. See `presets` directory for details. Notice that
+
+1. `preprocess.py`
+2. `train.py`
+3. `synthesis.py`
+
+accepts `--preset=<json>` optional parameter, which specifies where to load preset parameters. If you are going to use preset parameters, then you must use same `--preset=<json>` throughout preprocessing, training and evaluation. e.g.,
+
+```
+python preprocess.py --preset=presets/deepvoice3_ljspeech.json ljspeech ~/data/LJSpeech-1.0
+python train.py --preset=presets/deepvoice3_ljspeech.json --data-root=./data/ljspeech
+```
+
+instead of
+
+```
+python preprocess.py ljspeech ~/data/LJSpeech-1.0
+# warning! this may use different hyper parameters used at preprocessing stage
+python train.py --preset=presets/deepvoice3_ljspeech.json --data-root=./data/ljspeech
+```
+
+### 0. Download dataset
+
+- LJSpeech (en): https://keithito.com/LJ-Speech-Dataset/
+- VCTK (en): http://homepages.inf.ed.ac.uk/jyamagis/page3/page58/page58.html
+- JSUT (jp): https://sites.google.com/site/shinnosuketakamichi/publication/jsut
+- NIKL (ko) (**Need korean cellphone number to access it**): http://www.korean.go.kr/front/board/boardStandardView.do?board_id=4&mn_id=17&b_seq=464
+
+### 1. Preprocessing
+
+Usage:
+
+```
+python preprocess.py ${dataset_name} ${dataset_path} ${out_dir} --preset=<json>
+```
+
+Supported `${dataset_name}`s are:
+
+- `ljspeech` (en, single speaker)
+- `vctk` (en, multi-speaker)
+- `jsut` (jp, single speaker)
+- `nikl_m` (ko, multi-speaker)
+- `nikl_s` (ko, single speaker)
+
+Assuming you use preset parameters known to work good for LJSpeech dataset / DeepVoice3 and have data in `~/data/LJSpeech-1.0`, then you can preprocess data by:
+
+```
+python preprocess.py --preset=presets/deepvoice3_ljspeech.json ljspeech ~/data/LJSpeech-1.0/ ./data/ljspeech
+```
+
+When this is done, you will see extracted features (mel-spectrograms and linear spectrograms) in `./data/ljspeech`.
+
+#### 1-1. Building custom dataset. (using json_meta)
+Building your own dataset, with metadata in JSON format (compatible with [carpedm20/multi-speaker-tacotron-tensorflow](https://github.com/carpedm20/multi-Speaker-tacotron-tensorflow)) is currently supported.
+Usage:
+
+```
+python preprocess.py json_meta ${list-of-JSON-metadata-paths} ${out_dir} --preset=<json>
+```
+You may need to modify pre-existing preset JSON file, especially `n_speakers`. For english multispeaker, start with `presets/deepvoice3_vctk.json`.
+
+Assuming you have dataset A (Speaker A) and dataset B (Speaker B), each described in the JSON metadata file `./datasets/datasetA/alignment.json` and `./datasets/datasetB/alignment.json`, then you can preprocess  data by:
+
+```
+python preprocess.py json_meta "./datasets/datasetA/alignment.json,./datasets/datasetB/alignment.json" "./datasets/processed_A+B" --preset=(path to preset json file)
+```
+
+#### 1-2. Preprocessing custom english datasets with long silence. (Based on [vctk_preprocess](vctk_preprocess/))
+
+Some dataset, especially automatically generated dataset may include long silence and undesirable leading/trailing noises, undermining the char-level seq2seq model.
+(e.g. VCTK, although this is covered in vctk_preprocess)
+
+To deal with the problem, `gentle_web_align.py` will
+- **Prepare phoneme alignments for all utterances**
+- Cut silences during preprocessing
+
+`gentle_web_align.py` uses [Gentle](https://github.com/lowerquality/gentle), a kaldi based speech-text alignment tool. This accesses web-served Gentle application, aligns given sound segments with transcripts and converts the result to HTK-style label files, to be processed in `preprocess.py`. Gentle can be run in Linux/Mac/Windows(via Docker).
+
+Preliminary results show that while HTK/festival/merlin-based method in `vctk_preprocess/prepare_vctk_labels.py` works better on VCTK, Gentle is more stable with audio clips with ambient noise. (e.g. movie excerpts)
+
+Usage:
+(Assuming Gentle is running at `localhost:8567` (Default when not specified))
+1. When sound file and transcript files are saved in separate folders. (e.g. sound files are at `datasetA/wavs` and transcripts are at `datasetA/txts`)
+```
+python gentle_web_align.py -w "datasetA/wavs/*.wav" -t "datasetA/txts/*.txt" --server_addr=localhost --port=8567
+```
+
+2. When sound file and transcript files are saved in nested structure. (e.g. `datasetB/speakerN/blahblah.wav` and `datasetB/speakerN/blahblah.txt`)
+```
+python gentle_web_align.py --nested-directories="datasetB" --server_addr=localhost --port=8567
+```
+**Once you have phoneme alignment for each utterance, you can extract features by running `preprocess.py`**
+
+### 2. Training
+
+Usage:
+
+```
+python train.py --data-root=${data-root} --preset=<json> --hparams="parameters you may want to override"
+```
+
+Suppose you build a DeepVoice3-style model using LJSpeech dataset, then you can train your model by:
+
+```
+python train.py --preset=presets/deepvoice3_ljspeech.json --data-root=./data/ljspeech/
+```
+
+Model checkpoints (.pth) and alignments (.png) are saved in `./checkpoints` directory per 10000 steps by default.
+
+#### NIKL
+
+Pleae check [this](https://github.com/homink/deepvoice3_pytorch/blob/master/nikl_preprocess/README.md) in advance and follow the commands below.
+
+```
+python preprocess.py nikl_s ${your_nikl_root_path} data/nikl_s --preset=presets/deepvoice3_nikls.json
+
+python train.py --data-root=./data/nikl_s --checkpoint-dir checkpoint_nikl_s --preset=presets/deepvoice3_nikls.json
+```
+
+### 4. Monitor with Tensorboard
+
+Logs are dumped in `./log` directory by default. You can monitor logs by tensorboard:
+
+```
+tensorboard --logdir=log
+```
+
+### 5. Synthesize from a checkpoint
+
+Given a list of text, `synthesis.py` synthesize audio signals from trained model. Usage is:
+
+```
+python synthesis.py ${checkpoint_path} ${text_list.txt} ${output_dir} --preset=<json>
+```
+
+Example test_list.txt:
+
+```
+Generative adversarial network or variational auto-encoder.
+Once upon a time there was a dear little girl who was loved by every one who looked at her, but most of all by her grandmother, and there was nothing that she would not have given to the child.
+A text-to-speech synthesis system typically consists of multiple stages, such as a text analysis frontend, an acoustic model and an audio synthesis module.
 
 
